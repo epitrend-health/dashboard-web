@@ -1,0 +1,5 @@
+{
+  "name": "EpiTrend — Disease Trend Forecasting Dashboard",
+  "description": "Hospital disease trend monitoring, predictive case forecasting, model evaluation, and CSV dataset import management platform.",
+  "requestFramePermissions": []
+}
