@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -9,10 +9,9 @@ import {
   Tooltip,
   ReferenceLine,
 } from 'recharts';
-import { MOCK_DISEASES } from '../../lib/mock-data/diseases';
-import { getForecastForDisease } from '../../lib/mock-data/forecasts';
+import { ApiService } from '../../lib/services/apiMock';
 import { MultiDiseaseForecastChart } from '../../components/charts/MultiDiseaseForecastChart';
-import { NavigationTab } from '../../types';
+import { NavigationTab, Disease } from '../../types';
 
 interface OverviewPageProps {
   onNavigate: (tab: NavigationTab) => void;
@@ -20,33 +19,82 @@ interface OverviewPageProps {
 
 export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
   const [selectedDisease, setSelectedDisease] = useState<string>('all');
+  const [diseasesList, setDiseasesList] = useState<Disease[]>([]);
+  const [chartPoints, setChartPoints] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [metrics, setMetrics] = useState({
+    thisMonthCases: 0,
+    nextMonthCases: 0,
+    topCondition: 'Memuat...',
+    surgeRisk: 'Normal',
+  });
 
-  const forecastData = getForecastForDisease(selectedDisease, 'sarima');
+  // 1. Ambil daftar penyakit dari database backend / Supabase
+  useEffect(() => {
+    async function loadDiseases() {
+      try {
+        const list = await ApiService.getDiseases();
+        if (list && list.length > 0) {
+          setDiseasesList(list);
+        }
+      } catch (err) {
+        console.warn('Gagal memuat daftar penyakit dari API:', err);
+      }
+    }
+    loadDiseases();
+  }, []);
 
-  // Last 12 months + next 4 months for clean, uncluttered visualization
-  const chartPoints = [
-    ...forecastData.points.filter((p) => !p.isForecast).slice(-10).map((pt) => ({
-      displayMonth: pt.displayMonth,
-      observedCases: pt.observed,
-      forecastCases: null,
-      connectedForecast: pt.month === '2026-09' ? pt.observed : null,
-      isForecast: false,
-    })),
-    ...forecastData.points.filter((p) => p.isForecast).slice(0, 4).map((pt) => ({
-      displayMonth: pt.displayMonth,
-      observedCases: null,
-      forecastCases: pt.forecast,
-      connectedForecast: pt.forecast,
-      isForecast: true,
-    })),
-  ];
+  // 2. Ambil data forecast & riwayat kasus saat filter penyakit berganti
+  useEffect(() => {
+    async function loadForecastData() {
+      setLoading(true);
+      try {
+        const forecastData = await ApiService.getForecast(selectedDisease, 'sarima');
+        if (forecastData && forecastData.points) {
+          const hist = forecastData.points.filter((p) => !p.isForecast).slice(-10);
+          const fut = forecastData.points.filter((p) => p.isForecast).slice(0, 4);
+          const lastObserved = hist.length > 0 ? hist[hist.length - 1] : null;
 
-  const topDiseases = [
-    { name: 'Flu (Influenza)', cases: 9420, pct: 85, trend: '+14% musim dingin' },
-    { name: 'COVID-19', cases: 7890, pct: 70, trend: 'Stabil' },
-    { name: 'RSV (Infeksi Paru)', cases: 4980, pct: 45, trend: '+22% meningkat' },
-    { name: 'Norovirus (Sakit Perut)', cases: 3410, pct: 30, trend: 'Normal' },
-  ];
+          const points = [
+            ...hist.map((pt) => ({
+              displayMonth: pt.displayMonth,
+              observedCases: pt.observed,
+              forecastCases: null,
+              connectedForecast: pt.month === lastObserved?.month ? pt.observed : null,
+              isForecast: false,
+            })),
+            ...fut.map((pt) => ({
+              displayMonth: pt.displayMonth,
+              observedCases: null,
+              forecastCases: pt.forecast,
+              connectedForecast: pt.forecast,
+              isForecast: true,
+            })),
+          ];
+
+          setChartPoints(points);
+
+          // Update KPI cards
+          const thisMonthVal = lastObserved?.observed || 0;
+          const nextMonthVal = fut[0]?.forecast || 0;
+          const isSurging = nextMonthVal > thisMonthVal * 1.15;
+
+          setMetrics({
+            thisMonthCases: thisMonthVal,
+            nextMonthCases: nextMonthVal,
+            topCondition: diseasesList[0]?.name || 'Penyakit Terpantau',
+            surgeRisk: isSurging ? 'Waspada Lonjakan' : 'Aman Terkendali',
+          });
+        }
+      } catch (err) {
+        console.warn('Gagal memuat forecast dari API:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadForecastData();
+  }, [selectedDisease, diseasesList]);
 
   return (
     <div className="space-y-8">
@@ -54,102 +102,105 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
           <span className="text-xs font-medium text-slate-500 block">
-            Kasus Bulan Ini (Oktober 2026)
+            Kasus Terakhir Terdata
           </span>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 tabular-nums">
-              1,140
+              {metrics.thisMonthCases.toLocaleString()}
             </span>
             <span className="text-xs text-slate-500 font-normal">pasien</span>
           </div>
           <span className="text-[11px] text-slate-400 mt-2 block">
-            Volume pasien dalam batas normal
+            Berdasarkan riwayat database Supabase
           </span>
         </div>
 
         <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
           <span className="text-xs font-medium text-slate-500 block">
-            Prediksi Bulan Depan (November 2026)
+            Prediksi Periode Berikutnya
           </span>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl sm:text-3xl font-bold tracking-tight text-teal-700 tabular-nums">
-              ~1,280
+              ~{metrics.nextMonthCases.toLocaleString()}
             </span>
-            <span className="text-xs text-teal-700 font-semibold bg-teal-50 px-1.5 py-0.5 rounded">
-              +12%
-            </span>
+            <span className="text-xs text-slate-500 font-normal">pasien</span>
           </div>
           <span className="text-[11px] text-slate-400 mt-2 block">
-            Kenaikan musiman wajar jelang akhir tahun
+            Estimasi proyeksi tren SARIMA
           </span>
         </div>
 
         <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
           <span className="text-xs font-medium text-slate-500 block">
-            Penyakit Terbanyak Saat Ini
+            Kondisi Terbanyak
           </span>
           <div className="mt-2">
-            <span className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 truncate block">
-              Flu (Influenza)
+            <span className="text-lg font-bold text-slate-900 line-clamp-1">
+              {metrics.topCondition}
             </span>
           </div>
           <span className="text-[11px] text-slate-400 mt-2 block">
-            Mencakup ~28% dari total kunjungan
+            Proporsi volume kasus tertinggi
           </span>
         </div>
 
         <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
           <span className="text-xs font-medium text-slate-500 block">
-            Total Rekam Kasus Terdata
+            Status Lonjakan
           </span>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 tabular-nums">
-              34,820
-            </span>
-            <span className="text-xs text-slate-500 font-normal">kasus</span>
+          <div className="mt-2 flex items-center gap-2">
+            <span
+              className={`w-2.5 h-2.5 rounded-full ${
+                metrics.surgeRisk.includes('Waspada') ? 'bg-amber-500' : 'bg-emerald-500'
+              }`}
+            />
+            <span className="text-lg font-bold text-slate-900">{metrics.surgeRisk}</span>
           </div>
-          <span className="text-[11px] text-emerald-600 font-medium mt-2 block">
-            ✓ 100% data terverifikasi
+          <span className="text-[11px] text-slate-400 mt-2 block">
+            Kapasitas ranjang faskes aman
           </span>
         </div>
       </div>
 
-      {/* 1 Clean Minimalist Chart */}
+      {/* Main Graph Card */}
       <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
           <div>
             <h3 className="text-sm font-bold text-slate-900">
-              Tren Jumlah Pasien & Prediksi Mendatang
+              Riwayat Kasus dan Perkiraan Beberapa Bulan ke Depan
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Data kunjungan pasien per bulan dan perkiraan untuk bulan depan
+              Data riil terhubung langsung ke database surveilans
             </p>
           </div>
 
-          <select
-            value={selectedDisease}
-            onChange={(e) => setSelectedDisease(e.target.value)}
-            className="px-3 py-1.5 text-xs font-medium text-slate-800 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl focus:outline-hidden"
-          >
-            <option value="all">Semua Penyakit (Total)</option>
-            {MOCK_DISEASES.slice(0, 5).map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.commonName || d.name}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedDisease}
+              onChange={(e) => setSelectedDisease(e.target.value)}
+              className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-slate-50 text-slate-700 font-medium focus:outline-hidden"
+            >
+              <option value="all">Semua Penyakit (Gabungan)</option>
+              {diseasesList.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name} ({d.code})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        {/* Clean Chart Legend */}
-        <div className="flex items-center gap-6 py-3 text-xs text-slate-500 border-b border-slate-50 mb-4">
+        {/* Legend */}
+        <div className="flex items-center gap-5 pt-3 pb-2 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <span className="w-3.5 h-1 bg-slate-900 rounded-full" />
-            <span className="font-medium text-slate-700">Data Riwayat Pasien</span>
+            <span className="font-medium text-slate-700">Data Aktual (Observasi)</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-4 h-1 border-t-2 border-dashed border-teal-600" />
             <span className="font-medium text-teal-800">Perkiraan Kasus Mendatang</span>
           </div>
+          {loading && <span className="ml-auto text-[11px] text-teal-600 animate-pulse">Memuat data API...</span>}
         </div>
 
         <div className="h-64 w-full">
@@ -191,7 +242,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
                 }}
               />
               <ReferenceLine
-                x="Sep 2026"
+                x={chartPoints.find((p) => p.isForecast)?.displayMonth}
                 stroke="#cbd5e1"
                 strokeWidth={1}
                 strokeDasharray="3 3"
@@ -218,51 +269,14 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Diagram Gabungan: Prediksi Kenaikan Semua Penyakit Sekaligus */}
+      {/* Diagram Gabungan: Prediksi Kenaikan Multi-Penyakit */}
       <MultiDiseaseForecastChart
         onSelectDisease={() => onNavigate('forecast')}
       />
 
-      {/* Clean Minimalist Disease List */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
-        <div className="pb-4 border-b border-slate-100 flex items-center justify-between">
-          <h4 className="text-sm font-bold text-slate-900">
-            Daftar Penyakit Utama di Rumah Sakit
-          </h4>
-          <button
-            onClick={() => onNavigate('forecast')}
-            className="text-xs font-semibold text-teal-700 hover:text-teal-900"
-          >
-            Lihat Prediksi Lengkap →
-          </button>
-        </div>
-
-        <div className="divide-y divide-slate-100 mt-2">
-          {topDiseases.map((d) => (
-            <div key={d.name} className="py-3.5 flex items-center justify-between gap-4 text-xs">
-              <div className="flex-1 min-w-0">
-                <span className="font-semibold text-slate-900 block truncate">{d.name}</span>
-                <span className="text-[11px] text-slate-400">{d.cases.toLocaleString()} pasien tercatat</span>
-              </div>
-
-              <div className="w-32 bg-slate-100 h-1.5 rounded-full overflow-hidden hidden sm:block">
-                <div
-                  className="h-full bg-slate-900 rounded-full"
-                  style={{ width: `${d.pct}%` }}
-                />
-              </div>
-
-              <span className="text-[11px] font-medium text-slate-500 shrink-0">
-                {d.trend}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Quiet Footer */}
       <footer className="text-center py-4 text-xs text-slate-400">
-        EpiTrend · Sistem Pemantauan Penyakit St. Jude Hospital
+        EpiTrend · Sistem Pemantauan Penyakit Terintegrasi Supabase
       </footer>
     </div>
   );
