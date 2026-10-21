@@ -2,8 +2,8 @@ import { ImportBatch } from '../../types';
 
 export const MOCK_IMPORT_BATCHES: ImportBatch[] = [
   {
-    id: 'IMP-2026-0929',
-    timestamp: '2026-09-29 18:42 UTC',
+    id: 'IMP-2021-1120',
+    timestamp: '2021-11-20 18:42 UTC',
     uploadedBy: 'Dr. Evelyn Vance (Chief Epidemiologist)',
     fileCount: 2,
     totalRecords: 14800,
@@ -14,7 +14,7 @@ export const MOCK_IMPORT_BATCHES: ImportBatch[] = [
     targetDatasetType: 'Encounters & Diagnoses',
     files: [
       {
-        name: 'encounters_september_2026_batch.csv',
+        name: 'encounters_november_2021_batch.csv',
         size: '1.8 MB',
         rows: 9200,
         validRows: 9190,
@@ -22,7 +22,7 @@ export const MOCK_IMPORT_BATCHES: ImportBatch[] = [
         status: 'Warning',
       },
       {
-        name: 'icd10_secondary_diagnoses_sep.csv',
+        name: 'icd10_secondary_diagnoses_nov.csv',
         size: '940 KB',
         rows: 5600,
         validRows: 5592,
@@ -37,8 +37,8 @@ export const MOCK_IMPORT_BATCHES: ImportBatch[] = [
     ],
   },
   {
-    id: 'IMP-2026-0915',
-    timestamp: '2026-09-15 10:14 UTC',
+    id: 'IMP-2021-1015',
+    timestamp: '2021-10-15 10:14 UTC',
     uploadedBy: 'Marcus Brody (Health Informatics Analyst)',
     fileCount: 1,
     totalRecords: 120,
@@ -49,7 +49,7 @@ export const MOCK_IMPORT_BATCHES: ImportBatch[] = [
     targetDatasetType: 'Monthly Cases',
     files: [
       {
-        name: 'monthly_surveillance_aggregate_aug2026.csv',
+        name: 'monthly_surveillance_aggregate_oct2021.csv',
         size: '18 KB',
         rows: 120,
         validRows: 120,
@@ -63,8 +63,8 @@ export const MOCK_IMPORT_BATCHES: ImportBatch[] = [
     ],
   },
   {
-    id: 'IMP-2026-0830',
-    timestamp: '2026-08-30 16:50 UTC',
+    id: 'IMP-2021-0830',
+    timestamp: '2021-08-30 16:50 UTC',
     uploadedBy: 'Marcus Brody (Health Informatics Analyst)',
     fileCount: 3,
     totalRecords: 24500,
@@ -75,7 +75,7 @@ export const MOCK_IMPORT_BATCHES: ImportBatch[] = [
     targetDatasetType: 'Lab Observations',
     files: [
       {
-        name: 'pcr_respiratory_panel_aug.csv',
+        name: 'pcr_respiratory_panel_aug2021.csv',
         size: '2.4 MB',
         rows: 14200,
         validRows: 14197,
@@ -83,7 +83,7 @@ export const MOCK_IMPORT_BATCHES: ImportBatch[] = [
         status: 'Success',
       },
       {
-        name: 'gastro_antigen_tests_aug.csv',
+        name: 'gastro_antigen_tests_aug2021.csv',
         size: '1.1 MB',
         rows: 6800,
         validRows: 6798,
@@ -91,7 +91,7 @@ export const MOCK_IMPORT_BATCHES: ImportBatch[] = [
         status: 'Success',
       },
       {
-        name: 'blood_culture_screen_aug.csv',
+        name: 'blood_culture_screen_aug2021.csv',
         size: '560 KB',
         rows: 3500,
         validRows: 3500,
@@ -105,8 +105,8 @@ export const MOCK_IMPORT_BATCHES: ImportBatch[] = [
     ],
   },
   {
-    id: 'IMP-2026-0812',
-    timestamp: '2026-08-12 09:22 UTC',
+    id: 'IMP-2021-0712',
+    timestamp: '2021-07-12 09:22 UTC',
     uploadedBy: 'Elena Rostova (Clinical Data Admin)',
     fileCount: 1,
     totalRecords: 4800,
@@ -117,7 +117,7 @@ export const MOCK_IMPORT_BATCHES: ImportBatch[] = [
     targetDatasetType: 'Monthly Cases',
     files: [
       {
-        name: 'corrupted_legacy_export_july2026.csv',
+        name: 'corrupted_legacy_export_july2021.csv',
         size: '520 KB',
         rows: 4800,
         validRows: 0,

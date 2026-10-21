@@ -71,17 +71,39 @@ export const ApiService = {
   /**
    * GET /api/forecast
    */
-  async getForecast(diseaseId: string = 'influenza', modelId: string = 'sarima'): Promise<ForecastDataset> {
+  async getForecast(diseaseId: string = 'influenza', modelId: string = 'sarima', cutoffMonth?: string): Promise<ForecastDataset> {
     if (USE_MOCK) return Promise.resolve(getForecastForDisease(diseaseId, modelId));
     try {
+      const query = new URLSearchParams({
+        diseaseId,
+        modelId,
+      });
+      if (cutoffMonth) {
+        query.set('cutoffMonth', cutoffMonth);
+      }
       const data = await Promise.race([
-        apiClient.get<ForecastDataset>(`/forecast?diseaseId=${encodeURIComponent(diseaseId)}&modelId=${encodeURIComponent(modelId)}`),
+        apiClient.get<ForecastDataset>(`/forecast?${query.toString()}`),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2500)),
       ]);
       return (data && data.points && data.points.length > 0) ? data : getForecastForDisease(diseaseId, modelId);
     } catch {
       // Otomatis fallback ke data simulasi SARIMA jika backend belum aktif
       return getForecastForDisease(diseaseId, modelId);
+    }
+  },
+
+  /**
+   * GET /api/supply-demand
+   */
+  async getSupplyDemand(diseaseId: string = '444814009'): Promise<any> {
+    try {
+      const data = await Promise.race([
+        apiClient.get<any>(`/supply-demand?diseaseCode=${encodeURIComponent(diseaseId)}`),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000)),
+      ]);
+      return data;
+    } catch {
+      return null;
     }
   },
 

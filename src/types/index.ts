@@ -2,6 +2,7 @@ export type NavigationTab =
   | 'overview'
   | 'trends'
   | 'forecast'
+  | 'supply-demand'
   | 'models'
   | 'data-management'
   | 'import-history'

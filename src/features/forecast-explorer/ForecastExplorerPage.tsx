@@ -16,6 +16,7 @@ export const ForecastExplorerPage: React.FC = () => {
   const [viewMode, setViewMode] = useState<'combined' | 'single'>('combined');
   const [selectedDiseaseId, setSelectedDiseaseId] = useState<string>('all');
   const [horizonMonths, setHorizonMonths] = useState<number>(6); // 3, 6, 12
+  const [cutoffDate, setCutoffDate] = useState<string>(''); // e.g., '2021-01'
   const [diseasesList, setDiseasesList] = useState<Disease[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [modelMeta, setModelMeta] = useState<any>(null);
@@ -45,7 +46,7 @@ export const ForecastExplorerPage: React.FC = () => {
       if (!selectedDiseaseId) return;
       setLoading(true);
       try {
-        const res = await ApiService.getForecast(selectedDiseaseId, 'sarima');
+        const res = await ApiService.getForecast(selectedDiseaseId, 'sarima', cutoffDate || undefined);
         if (res && res.points) {
           setModelMeta(res.metadata);
 
@@ -76,7 +77,7 @@ export const ForecastExplorerPage: React.FC = () => {
       }
     }
     fetchForecast();
-  }, [selectedDiseaseId, horizonMonths]);
+  }, [selectedDiseaseId, horizonMonths, cutoffDate]);
 
   const selectedDisease = diseasesList.find((d) => (d.code || d.id) === selectedDiseaseId) || diseasesList[0];
 
@@ -148,8 +149,27 @@ export const ForecastExplorerPage: React.FC = () => {
               </select>
             </div>
 
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 font-medium">Batas Bulan Riwayat:</span>
+              <input
+                type="month"
+                value={cutoffDate}
+                onChange={(e) => setCutoffDate(e.target.value)}
+                className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-slate-50 text-slate-800 font-medium focus:outline-hidden focus:ring-2 focus:ring-teal-500"
+              />
+              {cutoffDate && (
+                <button
+                  type="button"
+                  onClick={() => setCutoffDate('')}
+                  className="text-[11px] text-teal-700 hover:underline"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-400 mr-1">Jangkauan:</span>
+              <span className="text-xs text-slate-400 mr-1">Jangkauan Proyeksi:</span>
               {[3, 6, 12].map((m) => (
                 <button
                   key={m}

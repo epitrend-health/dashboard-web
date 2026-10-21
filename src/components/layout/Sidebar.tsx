@@ -55,6 +55,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: LineChart,
     },
     {
+      id: 'supply-demand' as NavigationTab,
+      label: 'Kebutuhan & Stok',
+      sublabel: 'Supply vs Demand',
+      icon: ShieldAlert,
+    },
+    {
       id: 'models' as NavigationTab,
       label: 'Akurasi Model',
       sublabel: 'Model Accuracy',

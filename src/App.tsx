@@ -9,6 +9,7 @@ import { TopNavbar } from './components/layout/TopNavbar';
 import { OverviewPage } from './features/overview/OverviewPage';
 import { DiseaseTrendsPage } from './features/disease-trends/DiseaseTrendsPage';
 import { ForecastExplorerPage } from './features/forecast-explorer/ForecastExplorerPage';
+import { SupplyDemandPage } from './features/supply-demand/SupplyDemandPage';
 import { ModelPerformancePage } from './features/model-performance/ModelPerformancePage';
 import { DataManagementPage } from './features/data-management/DataManagementPage';
 import { ImportHistoryPage } from './features/import-history/ImportHistoryPage';
@@ -59,6 +60,9 @@ export default function App() {
             )}
             {currentTab === 'forecast' && (
               <ForecastExplorerPage />
+            )}
+            {currentTab === 'supply-demand' && (
+              <SupplyDemandPage />
             )}
             {currentTab === 'models' && (
               <ModelPerformancePage simpleMode={true} />
