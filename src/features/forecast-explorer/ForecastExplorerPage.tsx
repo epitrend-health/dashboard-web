@@ -28,8 +28,8 @@ export const ForecastExplorerPage: React.FC = () => {
         const list = await ApiService.getDiseases();
         if (list && list.length > 0) {
           setDiseasesList(list);
-          if (selectedDiseaseId === 'all') {
-            setSelectedDiseaseId(list[0].id);
+          if (selectedDiseaseId === 'all' || !selectedDiseaseId) {
+            setSelectedDiseaseId(list[0].code || list[0].id);
           }
         }
       } catch (err) {
@@ -78,7 +78,7 @@ export const ForecastExplorerPage: React.FC = () => {
     fetchForecast();
   }, [selectedDiseaseId, horizonMonths]);
 
-  const selectedDisease = diseasesList.find((d) => d.id === selectedDiseaseId) || diseasesList[0];
+  const selectedDisease = diseasesList.find((d) => (d.code || d.id) === selectedDiseaseId) || diseasesList[0];
 
   const getStatusBadge = (cases: number, baseline: number) => {
     if (cases > baseline * 1.35) {
@@ -137,11 +137,14 @@ export const ForecastExplorerPage: React.FC = () => {
                 onChange={(e) => setSelectedDiseaseId(e.target.value)}
                 className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-slate-50 text-slate-800 font-semibold focus:outline-hidden"
               >
-                {diseasesList.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name} ({d.code})
-                  </option>
-                ))}
+                {diseasesList.map((d) => {
+                  const val = d.code || d.id;
+                  return (
+                    <option key={val} value={val}>
+                      {d.name} ({d.code})
+                    </option>
+                  );
+                })}
               </select>
             </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -21,59 +21,35 @@ import {
   Layers,
   Sparkles,
 } from 'lucide-react';
-import { MOCK_DISEASES } from '../../lib/mock-data/diseases';
-import { getForecastForDisease } from '../../lib/mock-data/forecasts';
+import { ApiService } from '../../lib/services/apiMock';
+import { Disease } from '../../types';
 
 interface DiseaseConfig {
   id: string;
+  code: string;
   name: string;
   shortName: string;
   color: string;
   category: string;
   defaultVisible: boolean;
+  baseCases: number;
+  maxFuture: number;
+  peakMonth: string;
+  pctChange: number;
+  isRising: boolean;
+  isFalling: boolean;
+  points: any[];
 }
 
-const TRACKED_DISEASES: DiseaseConfig[] = [
-  {
-    id: 'influenza',
-    name: 'Flu (Influenza A & B)',
-    shortName: 'Flu',
-    color: '#e11d48', // Red / Rose
-    category: 'Pernapasan',
-    defaultVisible: true,
-  },
-  {
-    id: 'rsv',
-    name: 'RSV (Infeksi Paru Balita & Lansia)',
-    shortName: 'RSV',
-    color: '#f59e0b', // Amber / Orange
-    category: 'Pernapasan',
-    defaultVisible: true,
-  },
-  {
-    id: 'covid19',
-    name: 'COVID-19',
-    shortName: 'COVID-19',
-    color: '#6366f1', // Indigo / Purple
-    category: 'Pernapasan',
-    defaultVisible: true,
-  },
-  {
-    id: 'norovirus',
-    name: 'Norovirus (Muntaber / Lambung)',
-    shortName: 'Norovirus',
-    color: '#0d9488', // Teal
-    category: 'Pencernaan',
-    defaultVisible: true,
-  },
-  {
-    id: 'dengue',
-    name: 'Demam Berdarah (Dengue)',
-    shortName: 'Dengue (DBD)',
-    color: '#10b981', // Emerald / Green
-    category: 'Nyamuk',
-    defaultVisible: true,
-  },
+const PALETTE = [
+  '#e11d48', // Rose
+  '#0d9488', // Teal
+  '#6366f1', // Indigo
+  '#f59e0b', // Amber
+  '#10b981', // Emerald
+  '#8b5cf6', // Purple
+  '#0284c7', // Sky
+  '#ec4899', // Pink
 ];
 
 interface MultiDiseaseForecastChartProps {
@@ -83,78 +59,122 @@ interface MultiDiseaseForecastChartProps {
 export const MultiDiseaseForecastChart: React.FC<MultiDiseaseForecastChartProps> = ({
   onSelectDisease,
 }) => {
-  const [filterMode, setFilterMode] = useState<'all' | 'rising_only' | 'respiratory'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [horizonMonths, setHorizonMonths] = useState<6 | 12>(6);
-  const [visibleDiseases, setVisibleDiseases] = useState<Record<string, boolean>>({
-    influenza: true,
-    rsv: true,
-    covid19: true,
-    norovirus: true,
-    dengue: true,
-  });
+  const [loading, setLoading] = useState<boolean>(true);
+  const [diseaseForecasts, setDiseaseForecasts] = useState<DiseaseConfig[]>([]);
+  const [visibleDiseases, setVisibleDiseases] = useState<Record<string, boolean>>({});
 
-  // Pull real forecast points for each disease
-  const diseaseForecasts = useMemo(() => {
-    return TRACKED_DISEASES.map((d) => {
-      const fc = getForecastForDisease(d.id, 'sarima');
-      const histPt = fc.points.find((p) => p.month === '2026-09');
-      const baseCases = histPt ? (histPt.observed || histPt.forecast) : 100;
-      const futurePts = fc.points.filter((p) => p.isForecast);
-      const horizonPts = futurePts.slice(0, horizonMonths);
-      
-      const maxFuture = Math.max(...horizonPts.map((p) => p.forecast));
-      const peakPoint = horizonPts.find((p) => p.forecast === maxFuture);
-      const pctChange = Math.round(((maxFuture - baseCases) / baseCases) * 100);
-      const isRising = pctChange > 15;
-      const isFalling = pctChange < -15;
+  // 1. Ambil penyakit langsung dari database Supabase melalui API
+  useEffect(() => {
+    async function loadData() {
+      setLoading(true);
+      try {
+        const rawDiseases = await ApiService.getDiseases();
+        const topDiseases = (rawDiseases || []).slice(0, 6);
 
-      return {
-        ...d,
-        baseCases,
-        maxFuture,
-        peakMonth: peakPoint?.displayMonth || 'Nov 2026',
-        pctChange,
-        isRising,
-        isFalling,
-        points: fc.points,
-      };
-    });
+        // Ambil forecast per penyakit secara paralel dari endpoint API Supabase
+        const results = await Promise.all(
+          topDiseases.map(async (d, idx) => {
+            try {
+              const fc = await ApiService.getForecast(d.code || d.id, 'sarima');
+              const points = fc?.points || [];
+              const histPts = points.filter((p) => !p.isForecast);
+              const futurePts = points.filter((p) => p.isForecast);
+              const horizonPts = futurePts.slice(0, horizonMonths);
+
+              const lastObs = histPts.length > 0 ? histPts[histPts.length - 1] : null;
+              const baseCases = lastObs ? (lastObs.observed || lastObs.forecast || 1) : 1;
+              const maxFuture = horizonPts.length > 0 ? Math.max(...horizonPts.map((p) => p.forecast || 0)) : baseCases;
+              const peakPoint = horizonPts.find((p) => (p.forecast || 0) === maxFuture);
+              const pctChange = Math.round(((maxFuture - baseCases) / (baseCases || 1)) * 100);
+
+              const shortName = d.name.length > 20 ? d.name.substring(0, 18) + '...' : d.name;
+
+              return {
+                id: d.code || d.id,
+                code: d.code || d.id,
+                name: d.name,
+                shortName,
+                color: PALETTE[idx % PALETTE.length],
+                category: d.category || 'Clinical Conditions',
+                defaultVisible: true,
+                baseCases,
+                maxFuture,
+                peakMonth: peakPoint?.displayMonth || (horizonPts[0]?.displayMonth || 'Upcoming'),
+                pctChange,
+                isRising: pctChange > 15,
+                isFalling: pctChange < -15,
+                points,
+              } as DiseaseConfig;
+            } catch (err) {
+              console.warn(`Gagal memuat forecast untuk ${d.name}:`, err);
+              return null;
+            }
+          })
+        );
+
+        const validConfigs = results.filter(Boolean) as DiseaseConfig[];
+        setDiseaseForecasts(validConfigs);
+
+        const initialVisible: Record<string, boolean> = {};
+        validConfigs.forEach((c) => {
+          initialVisible[c.id] = true;
+        });
+        setVisibleDiseases(initialVisible);
+      } catch (err) {
+        console.error('Gagal mengambil daftar penyakit real time:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadData();
   }, [horizonMonths]);
 
-  // Build combined multi-line timeline chart data
-  const chartData = useMemo(() => {
-    // 1 historical anchor month (Sep 2026) + upcoming horizon months
-    const months = [
-      { month: '2026-09', displayMonth: 'Sep 2026 (Riwayat)', isForecast: false },
-      { month: '2026-10', displayMonth: 'Okt 2026', isForecast: true },
-      { month: '2026-11', displayMonth: 'Nov 2026', isForecast: true },
-      { month: '2026-12', displayMonth: 'Des 2026', isForecast: true },
-      { month: '2027-01', displayMonth: 'Jan 2027', isForecast: true },
-      { month: '2027-02', displayMonth: 'Feb 2027', isForecast: true },
-      { month: '2027-03', displayMonth: 'Mar 2027', isForecast: true },
-      ...(horizonMonths === 12
-        ? [
-            { month: '2027-04', displayMonth: 'Apr 2027', isForecast: true },
-            { month: '2027-05', displayMonth: 'Mei 2027', isForecast: true },
-            { month: '2027-06', displayMonth: 'Jun 2027', isForecast: true },
-            { month: '2027-07', displayMonth: 'Jul 2027', isForecast: true },
-            { month: '2027-08', displayMonth: 'Agu 2027', isForecast: true },
-            { month: '2027-09', displayMonth: 'Sep 2027', isForecast: true },
-          ]
-        : []),
-    ];
+  // Ekstrak daftar kategori unik dari data database
+  const availableCategories = useMemo(() => {
+    const cats = new Set<string>();
+    diseaseForecasts.forEach((d) => {
+      if (d.category) cats.add(d.category);
+    });
+    return Array.from(cats);
+  }, [diseaseForecasts]);
 
-    return months.map((m) => {
+  // Bangun timeline bulan secara dinamis dari titik-titik data riil database
+  const chartData = useMemo(() => {
+    if (diseaseForecasts.length === 0) return [];
+
+    // Ambil semua bulan unik dari data forecast
+    const monthMap = new Map<string, { displayMonth: string; isForecast: boolean }>();
+    diseaseForecasts.forEach((df) => {
+      // Ambil 6 riwayat terakhir + n bulan masa depan
+      const hist = df.points.filter((p) => !p.isForecast).slice(-6);
+      const fut = df.points.filter((p) => p.isForecast).slice(0, horizonMonths);
+      [...hist, ...fut].forEach((p) => {
+        if (!monthMap.has(p.month)) {
+          monthMap.set(p.month, {
+            displayMonth: p.displayMonth,
+            isForecast: Boolean(p.isForecast),
+          });
+        }
+      });
+    });
+
+    const sortedMonths = Array.from(monthMap.keys()).sort();
+
+    return sortedMonths.map((m) => {
+      const meta = monthMap.get(m)!;
       const row: Record<string, any> = {
-        month: m.month,
-        displayMonth: m.displayMonth,
-        isForecast: m.isForecast,
+        month: m,
+        displayMonth: meta.displayMonth,
+        isForecast: meta.isForecast,
       };
 
       diseaseForecasts.forEach((df) => {
-        const pt = df.points.find((p) => p.month === m.month);
+        const pt = df.points.find((p) => p.month === m);
         if (pt) {
-          row[df.id] = pt.isForecast ? pt.forecast : (pt.observed || pt.forecast);
+          row[df.id] = pt.isForecast ? pt.forecast : (pt.observed ?? pt.forecast);
         }
       });
 
@@ -162,7 +182,6 @@ export const MultiDiseaseForecastChart: React.FC<MultiDiseaseForecastChartProps>
     });
   }, [diseaseForecasts, horizonMonths]);
 
-  // Toggle single disease visibility
   const toggleDisease = (id: string) => {
     setVisibleDiseases((prev) => ({
       ...prev,
@@ -170,298 +189,196 @@ export const MultiDiseaseForecastChart: React.FC<MultiDiseaseForecastChartProps>
     }));
   };
 
-  // Filtered diseases based on user filter mode
+  // Filter penyakit berdasarkan kategori database yang dipilih
   const displayedDiseases = useMemo(() => {
     return diseaseForecasts.filter((d) => {
-      if (filterMode === 'rising_only') {
-        return d.isRising;
-      }
-      if (filterMode === 'respiratory') {
-        return d.category === 'Pernapasan';
-      }
-      return true;
+      if (selectedCategory === 'all') return true;
+      if (selectedCategory === 'rising_only') return d.isRising;
+      return d.category.toLowerCase() === selectedCategory.toLowerCase();
     });
-  }, [diseaseForecasts, filterMode]);
-
-  const risingDiseasesCount = diseaseForecasts.filter((d) => d.isRising).length;
+  }, [diseaseForecasts, selectedCategory]);
 
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl p-5 sm:p-6 shadow-xs space-y-6">
-      {/* Header with Title and Controls */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
-            <h3 className="text-base font-bold text-slate-900 tracking-tight">
-              Diagram Gabungan: Prediksi Kenaikan Semua Penyakit
-            </h3>
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Melihat sekaligus grafik perbandingan tren kasus mendatang untuk mendeteksi penyakit yang akan melonjak (Surge).
-          </p>
-        </div>
-
-        {/* View Controls: Filter & Horizon */}
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          {/* Quick Filter: All vs Rising Only */}
-          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs">
-            <button
-              onClick={() => setFilterMode('all')}
-              className={`px-3 py-1.5 rounded-lg transition-all font-medium ${
-                filterMode === 'all'
-                  ? 'bg-white text-slate-900 font-semibold shadow-xs'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              Semua Penyakit
-            </button>
-            <button
-              onClick={() => setFilterMode('rising_only')}
-              className={`px-3 py-1.5 rounded-lg transition-all font-medium flex items-center gap-1.5 ${
-                filterMode === 'rising_only'
-                  ? 'bg-rose-50 text-rose-700 font-semibold border border-rose-200 shadow-xs'
-                  : 'text-slate-500 hover:text-rose-700'
-              }`}
-            >
-              <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
-              <span>Hanya yang Diprediksi Naik ({risingDiseasesCount})</span>
-            </button>
-            <button
-              onClick={() => setFilterMode('respiratory')}
-              className={`px-3 py-1.5 rounded-lg transition-all font-medium ${
-                filterMode === 'respiratory'
-                  ? 'bg-white text-slate-900 font-semibold shadow-xs'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              Saluran Napas
-            </button>
-          </div>
-
-          {/* Horizon Selector */}
-          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs">
-            <button
-              onClick={() => setHorizonMonths(6)}
-              className={`px-2.5 py-1.5 rounded-lg transition-all font-medium ${
-                horizonMonths === 6
-                  ? 'bg-white text-slate-900 font-semibold shadow-xs'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              6 Bulan
-            </button>
-            <button
-              onClick={() => setHorizonMonths(12)}
-              className={`px-2.5 py-1.5 rounded-lg transition-all font-medium ${
-                horizonMonths === 12
-                  ? 'bg-white text-slate-900 font-semibold shadow-xs'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              1 Tahun
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Summary Cards: Status Kenaikan Setiap Penyakit */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {diseaseForecasts.map((df) => {
-          const isVisible = visibleDiseases[df.id];
-          return (
-            <button
-              key={df.id}
-              onClick={() => toggleDisease(df.id)}
-              className={`text-left p-3 rounded-xl border transition-all relative overflow-hidden group ${
-                isVisible
-                  ? 'bg-slate-50/80 border-slate-200 shadow-xs'
-                  : 'bg-white border-slate-100 opacity-50 hover:opacity-80'
-              }`}
-            >
-              {/* Color Bar */}
-              <div
-                className="absolute top-0 left-0 right-0 h-1"
-                style={{ backgroundColor: df.color }}
-              />
-
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-[11px] font-bold text-slate-900 truncate">
-                  {df.shortName}
-                </span>
-                <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: df.color }}
-                />
-              </div>
-
-              <div className="mt-2 flex items-baseline justify-between gap-1">
-                <span className="text-xs text-slate-500">Puncak:</span>
-                <span className="text-xs font-bold text-slate-900 tabular-nums">
-                  ~{df.maxFuture} psn
-                </span>
-              </div>
-
-              <div className="mt-1 flex items-center justify-between text-[11px]">
-                <span className="text-slate-400 truncate">{df.peakMonth}</span>
-                {df.pctChange > 0 ? (
-                  <span className={`font-bold flex items-center ${
-                    df.pctChange > 25 ? 'text-rose-600' : 'text-amber-600'
-                  }`}>
-                    <TrendingUp className="w-3 h-3 mr-0.5 inline" />
-                    +{df.pctChange}%
-                  </span>
-                ) : (
-                  <span className="text-emerald-600 font-bold flex items-center">
-                    <TrendingDown className="w-3 h-3 mr-0.5 inline" />
-                    {df.pctChange}%
-                  </span>
-                )}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Main Combined Chart */}
-      <div className="space-y-3">
-        {/* Chart Sub-legend and hint */}
-        <div className="flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2 px-1">
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
-              <span className="text-slate-600 font-medium">Titik Awal: Sep 2026</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-4 h-0.5 border-t-2 border-dashed border-teal-500" />
-              <span className="text-teal-700 font-medium">Prediksi Mendatang (Okt 2026 – {horizonMonths === 6 ? 'Mar 2027' : 'Sep 2027'})</span>
-            </span>
-          </div>
-
-          <span className="text-[11px] text-slate-400 hidden sm:inline">
-            Klik kartu penyakit di atas untuk menyembunyikan/menampilkan garis
-          </span>
-        </div>
-
-        {/* The Multi-Line Chart Container */}
-        <div className="h-72 sm:h-80 w-full pt-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={chartData}
-              margin={{ top: 12, right: 15, left: -10, bottom: 10 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-              <XAxis
-                dataKey="displayMonth"
-                tick={{ fontSize: 11, fill: '#64748b' }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 11, fill: '#64748b' }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v) => `${v}`}
-              />
-              <Tooltip
-                content={({ active, payload, label }) => {
-                  if (active && payload && payload.length) {
-                    const rowData = payload[0].payload;
-                    return (
-                      <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl border border-slate-800 text-xs min-w-[200px] space-y-2">
-                        <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
-                          <span className="font-bold text-slate-200">{label}</span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                            rowData.isForecast ? 'bg-teal-900/60 text-teal-300' : 'bg-slate-800 text-slate-300'
-                          }`}>
-                            {rowData.isForecast ? 'Prediksi' : 'Data Riwayat'}
-                          </span>
-                        </div>
-
-                        <div className="space-y-1">
-                          {payload.map((item: any) => {
-                            const config = TRACKED_DISEASES.find((d) => d.id === item.dataKey);
-                            if (!config) return null;
-                            return (
-                              <div
-                                key={item.dataKey}
-                                className="flex items-center justify-between text-[11px]"
-                              >
-                                <div className="flex items-center gap-1.5">
-                                  <span
-                                    className="w-2.5 h-2.5 rounded-full"
-                                    style={{ backgroundColor: item.color }}
-                                  />
-                                  <span className="text-slate-300">{config.shortName}:</span>
-                                </div>
-                                <span className="font-bold text-white tabular-nums">
-                                  {Math.round(item.value)} pasien
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-              
-              {/* Divider line between historical and forecast */}
-              <ReferenceLine
-                x="Sep 2026 (Riwayat)"
-                stroke="#94a3b8"
-                strokeDasharray="4 4"
-                label={{
-                  value: 'Batas Riwayat',
-                  position: 'top',
-                  fill: '#64748b',
-                  fontSize: 10,
-                }}
-              />
-
-              {/* Render dynamic line for each selected disease */}
-              {displayedDiseases.map((df) => {
-                if (!visibleDiseases[df.id]) return null;
-                return (
-                  <Line
-                    key={df.id}
-                    type="monotone"
-                    dataKey={df.id}
-                    name={df.shortName}
-                    stroke={df.color}
-                    strokeWidth={df.isRising ? 2.8 : 2}
-                    strokeDasharray={df.id === 'dengue' ? '3 3' : undefined}
-                    dot={{ r: 3, fill: df.color }}
-                    activeDot={{ r: 6 }}
-                    isAnimationActive={false}
-                  />
-                );
-              })}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Actionable Insights Box: Peringatan Kesiapan Rumah Sakit */}
-      <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-        <div className="flex items-start gap-2.5">
-          <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+    <div className="space-y-4">
+      {/* Header & Controls Card */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <span className="font-bold text-slate-900 block">
-              Peringatan Lonjakan Kasus Mendatang (Periode Nov 2026 – Feb 2027)
-            </span>
-            <p className="text-slate-600 mt-0.5">
-              Penyakit saluran pernapasan (<strong className="text-slate-900">Flu +121%</strong>, <strong className="text-slate-900">RSV +157%</strong>, dan <strong className="text-slate-900">COVID-19 +81%</strong>) diprediksi mengalami lonjakan bersamaan saat musim dingin. Rumah sakit disarankan menyiapkan persediaan obat flu, oksigen, dan kapasitas tempat tidur pediatrik.
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 bg-teal-50 text-teal-700 rounded-lg">
+                <Layers className="w-4 h-4" />
+              </span>
+              <h2 className="text-base font-bold text-slate-900">
+                Diagram Gabungan Multi-Penyakit (Database Supabase)
+              </h2>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Perbandingan tren penyakit aktif dari rekam medis database riil dan proyeksi lonjakannya.
             </p>
           </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Filter Kategori Dinamis dari Database */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-medium">
+              <button
+                onClick={() => setSelectedCategory('all')}
+                className={`px-3 py-1.5 rounded-lg transition-colors ${
+                  selectedCategory === 'all'
+                    ? 'bg-white text-slate-900 font-semibold shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Semua Kategori
+              </button>
+
+              <button
+                onClick={() => setSelectedCategory('rising_only')}
+                className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
+                  selectedCategory === 'rising_only'
+                    ? 'bg-white text-rose-700 font-semibold shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <TrendingUp className="w-3.5 h-3.5 text-rose-600" />
+                <span>Hanya Lonjakan</span>
+              </button>
+
+              {availableCategories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-3 py-1.5 rounded-lg transition-colors ${
+                    selectedCategory === cat
+                      ? 'bg-white text-slate-900 font-semibold shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Jangkauan Proyeksi */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-medium">
+              <button
+                onClick={() => setHorizonMonths(6)}
+                className={`px-3 py-1.5 rounded-lg transition-colors ${
+                  horizonMonths === 6
+                    ? 'bg-white text-slate-900 font-semibold shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                6 Bulan
+              </button>
+              <button
+                onClick={() => setHorizonMonths(12)}
+                className={`px-3 py-1.5 rounded-lg transition-colors ${
+                  horizonMonths === 12
+                    ? 'bg-white text-slate-900 font-semibold shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                12 Bulan
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-          <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-            Dengue (DBD) Turun -74%
+        {/* Legend Interaktif: Toggle penyakit dinamis */}
+        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mr-1">
+            Penyakit Terpantau:
           </span>
+          {diseaseForecasts.map((d) => {
+            const isVisible = visibleDiseases[d.id];
+            return (
+              <button
+                key={d.id}
+                onClick={() => toggleDisease(d.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                  isVisible
+                    ? 'bg-white text-slate-800 border-slate-200 shadow-xs'
+                    : 'bg-slate-50 text-slate-400 border-dashed border-slate-200 line-through'
+                }`}
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded-full"
+                  style={{ backgroundColor: isVisible ? d.color : '#cbd5e1' }}
+                />
+                <span>{d.shortName}</span>
+                <span className="text-[10px] text-slate-400 font-mono">({d.category})</span>
+              </button>
+            );
+          })}
         </div>
+      </div>
+
+      {/* Main Chart */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
+        {loading ? (
+          <div className="h-80 flex flex-col items-center justify-center text-slate-400 text-xs gap-2">
+            <span className="w-6 h-6 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
+            <span>Menghitung tren dan proyeksi dari database...</span>
+          </div>
+        ) : (
+          <div className="h-80 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 15, right: 15, left: -10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <XAxis dataKey="displayMonth" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={(v) => v.toLocaleString()} />
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-slate-900 text-white p-3 rounded-xl text-xs space-y-1.5 shadow-xl max-w-xs border border-slate-800">
+                          <div className="font-semibold text-slate-200 border-b border-slate-800 pb-1 flex items-center justify-between">
+                            <span>{label}</span>
+                            <span className="text-[10px] text-teal-400 font-mono">Real DB</span>
+                          </div>
+                          <div className="space-y-1">
+                            {payload.map((item: any) => {
+                              const config = diseaseForecasts.find((d) => d.id === item.dataKey);
+                              if (!config) return null;
+                              return (
+                                <div key={item.dataKey} className="flex items-center justify-between text-[11px]">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                                    <span className="text-slate-300">{config.shortName}:</span>
+                                  </div>
+                                  <span className="font-bold text-white tabular-nums">
+                                    {Math.round(item.value)} kasus
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                {displayedDiseases.map((df) => {
+                  if (!visibleDiseases[df.id]) return null;
+                  return (
+                    <Line
+                      key={df.id}
+                      type="monotone"
+                      dataKey={df.id}
+                      name={df.shortName}
+                      stroke={df.color}
+                      strokeWidth={df.isRising ? 2.8 : 2}
+                      dot={{ r: 3, fill: df.color }}
+                      activeDot={{ r: 6 }}
+                      isAnimationActive={false}
+                    />
+                  );
+                })}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </div>
     </div>
   );

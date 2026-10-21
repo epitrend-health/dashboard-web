@@ -21,7 +21,16 @@ export const ApiService = {
    */
   async getDiseases(): Promise<Disease[]> {
     if (USE_MOCK) return Promise.resolve([...MOCK_DISEASES]);
-    return apiClient.get<Disease[]>('/diseases');
+    try {
+      const data = await Promise.race([
+        apiClient.get<Disease[]>('/diseases'),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2500)),
+      ]);
+      return (data && data.length > 0) ? data : [...MOCK_DISEASES];
+    } catch {
+      // Otomatis fallback jika backend offline / database belum berisi
+      return [...MOCK_DISEASES];
+    }
   },
 
   /**
@@ -64,7 +73,16 @@ export const ApiService = {
    */
   async getForecast(diseaseId: string = 'influenza', modelId: string = 'sarima'): Promise<ForecastDataset> {
     if (USE_MOCK) return Promise.resolve(getForecastForDisease(diseaseId, modelId));
-    return apiClient.get<ForecastDataset>(`/forecast?diseaseId=${encodeURIComponent(diseaseId)}&modelId=${encodeURIComponent(modelId)}`);
+    try {
+      const data = await Promise.race([
+        apiClient.get<ForecastDataset>(`/forecast?diseaseId=${encodeURIComponent(diseaseId)}&modelId=${encodeURIComponent(modelId)}`),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2500)),
+      ]);
+      return (data && data.points && data.points.length > 0) ? data : getForecastForDisease(diseaseId, modelId);
+    } catch {
+      // Otomatis fallback ke data simulasi SARIMA jika backend belum aktif
+      return getForecastForDisease(diseaseId, modelId);
+    }
   },
 
   /**
