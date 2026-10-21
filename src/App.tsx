@@ -22,7 +22,7 @@ export default function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [selectedHospital, setSelectedHospital] = useState<string>(
-    'St. Jude Memorial Hospital (Main Campus)'
+    'Lahey Hospital & Medical Center (Burlington)'
   );
   const [dateRange, setDateRange] = useState<{ startDate: string; endDate: string }>({
     startDate: '2020-01-01',

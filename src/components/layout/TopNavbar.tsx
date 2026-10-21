@@ -65,9 +65,11 @@ const PAGE_TITLES: Record<NavigationTab, { title: string; subtitle: string }> = 
 };
 
 const HOSPITALS = [
-  { id: 'h1', name: 'St. Jude Memorial Hospital (Main Campus)', isDefault: true },
-  { id: 'h2', name: 'St. Jude Outpatient Pavilion', isDefault: false },
-  { id: 'h3', name: 'Metropolitan General Hospital (Demo)', isDefault: false },
+  { id: 'h1', name: 'Lahey Hospital & Medical Center (Burlington)', isDefault: true },
+  { id: 'h2', name: 'North Shore Medical Center (Salem)', isDefault: false },
+  { id: 'h3', name: 'Mount Auburn Hospital (Cambridge)', isDefault: false },
+  { id: 'h4', name: 'Beth Israel Deaconess Hospital (Plymouth)', isDefault: false },
+  { id: 'h5', name: 'Cambridge Health Alliance (Cambridge)', isDefault: false },
 ];
 
 export const TopNavbar: React.FC<TopNavbarProps> = ({
@@ -434,12 +436,13 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           )}
         </div>
 
-        {/* Quick Upload Action */}
+        {/* Quick Upload Action - Neutral clean styling */}
         <button
           onClick={() => onNavigate('csv-import')}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-medium transition-colors"
+          title="Unggah CSV"
         >
-          <Upload className="w-3.5 h-3.5" />
+          <Upload className="w-3.5 h-3.5 text-slate-500" />
           <span className="hidden sm:inline">Unggah CSV</span>
         </button>
 

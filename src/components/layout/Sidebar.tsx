@@ -117,21 +117,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
           isMobileOpen ? 'translate-x-0 w-64 shadow-2xl' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-        {/* Brand Header */}
-        <div className="flex items-center justify-between px-4 py-4 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-400 border border-teal-500/30 flex items-center justify-center shrink-0">
-              <ShieldAlert className="w-5 h-5 text-teal-400" />
-            </div>
-            {(!isCollapsed || isMobileOpen) && (
+        {/* Brand Header - Clean typography without extra badge/symbol */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+          <div className="flex items-center gap-2.5">
+            {(!isCollapsed || isMobileOpen) ? (
               <div className="flex flex-col overflow-hidden">
-                <span className="font-bold text-base tracking-tight text-white flex items-center gap-1.5">
+                <span className="font-extrabold text-lg tracking-tight text-white">
                   EpiTrend
                 </span>
                 <span className="text-[10px] text-slate-400 truncate">
-                  Sistem Prakiraan Rumah Sakit
+                  Hospital Disease Surveillance
                 </span>
               </div>
+            ) : (
+              <span className="font-extrabold text-lg text-teal-400 mx-auto">
+                E
+              </span>
             )}
           </div>
 
@@ -154,53 +155,71 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* Navigation List */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 px-3 mb-2">
-            {!isCollapsed || isMobileOpen ? 'Menu Utama' : '•'}
-          </div>
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentTab === item.id;
+        {/* Navigation List by Categories */}
+        <nav className="flex-1 px-3 py-3 space-y-4 overflow-y-auto">
+          {[
+            {
+              category: 'Surveilans & Tren',
+              items: [
+                { id: 'overview' as NavigationTab, label: 'Ringkasan', sublabel: 'Overview Kasus', icon: LayoutDashboard },
+                { id: 'trends' as NavigationTab, label: 'Tren Penyakit', sublabel: 'Disease Trends', icon: TrendingUp },
+                { id: 'forecast' as NavigationTab, label: 'Prakiraan Kasus', sublabel: 'Forecast Explorer', icon: LineChart },
+              ],
+            },
+            {
+              category: 'Operasional & Farmasi',
+              items: [
+                { id: 'supply-demand' as NavigationTab, label: 'Kebutuhan & Stok', sublabel: 'Supply vs Demand', icon: ShieldAlert },
+                { id: 'models' as NavigationTab, label: 'Evaluasi Model', sublabel: 'Model Accuracy', icon: ShieldCheck },
+              ],
+            },
+            {
+              category: 'Manajemen Data & Sistem',
+              items: [
+                { id: 'data-management' as NavigationTab, label: 'Katalog Data', sublabel: 'Data Records', icon: Database },
+                { id: 'csv-import' as NavigationTab, label: 'Unggah CSV', sublabel: 'Import Dataset', icon: UploadCloud },
+                { id: 'import-history' as NavigationTab, label: 'Riwayat Unggah', sublabel: 'Import History', icon: History },
+                { id: 'settings' as NavigationTab, label: 'Pengaturan', sublabel: 'Settings', icon: Settings },
+              ],
+            },
+          ].map((sec) => (
+            <div key={sec.category} className="space-y-1">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-3 py-1">
+                {!isCollapsed || isMobileOpen ? sec.category : '—'}
+              </div>
+              {sec.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = currentTab === item.id;
 
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleTabClick(item.id)}
-                title={isCollapsed && !isMobileOpen ? `${item.label} (${item.sublabel})` : undefined}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors text-left group ${
-                  isActive
-                    ? 'bg-teal-500/15 text-teal-300 border border-teal-500/30 shadow-xs font-semibold'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                } ${
-                  item.isAction
-                    ? 'mt-3 border border-dashed border-teal-500/40 bg-teal-500/10 text-teal-300 hover:bg-teal-500/20'
-                    : ''
-                }`}
-              >
-                <Icon
-                  className={`w-4 h-4 shrink-0 transition-colors ${
-                    isActive ? 'text-teal-400' : 'text-slate-400 group-hover:text-slate-200'
-                  }`}
-                />
-                {(!isCollapsed || isMobileOpen) && (
-                  <div className="flex items-center justify-between flex-1 truncate">
-                    <div className="flex flex-col truncate">
-                      <span className="truncate font-medium">{item.label}</span>
-                      <span className="text-[10px] text-slate-500 truncate leading-none mt-0.5">
-                        {item.sublabel}
-                      </span>
-                    </div>
-                    {item.isAction && (
-                      <span className="text-[9px] font-semibold text-teal-300 bg-teal-950 px-1.5 py-0.5 rounded border border-teal-800/80">
-                        Baru
-                      </span>
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleTabClick(item.id)}
+                    title={isCollapsed && !isMobileOpen ? `${item.label} (${item.sublabel})` : undefined}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors text-left group ${
+                      isActive
+                        ? 'bg-teal-500/15 text-teal-300 border border-teal-500/30 shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                    }`}
+                  >
+                    <Icon
+                      className={`w-4 h-4 shrink-0 transition-colors ${
+                        isActive ? 'text-teal-400' : 'text-slate-400 group-hover:text-slate-200'
+                      }`}
+                    />
+                    {(!isCollapsed || isMobileOpen) && (
+                      <div className="flex flex-col truncate">
+                        <span className="truncate font-medium">{item.label}</span>
+                        <span className="text-[10px] text-slate-500 truncate leading-none mt-0.5">
+                          {item.sublabel}
+                        </span>
+                      </div>
                     )}
-                  </div>
-                )}
-              </button>
-            );
-          })}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         {/* User Profile & Collapse Toggle */}
