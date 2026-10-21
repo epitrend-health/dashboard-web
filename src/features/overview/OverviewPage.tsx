@@ -15,9 +15,15 @@ import { NavigationTab, Disease } from '../../types';
 
 interface OverviewPageProps {
   onNavigate: (tab: NavigationTab) => void;
+  startDate?: string;
+  endDate?: string;
 }
 
-export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
+export const OverviewPage: React.FC<OverviewPageProps> = ({
+  onNavigate,
+  startDate = '2020-01-01',
+  endDate = '2021-11-30',
+}) => {
   const [selectedDisease, setSelectedDisease] = useState<string>('all');
   const [diseasesList, setDiseasesList] = useState<Disease[]>([]);
   const [chartPoints, setChartPoints] = useState<any[]>([]);
@@ -44,14 +50,26 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
     loadDiseases();
   }, []);
 
-  // 2. Ambil data forecast & riwayat kasus saat filter penyakit berganti
+  // 2. Ambil data forecast & riwayat kasus saat filter penyakit atau tanggal berganti
   useEffect(() => {
     async function loadForecastData() {
       setLoading(true);
       try {
-        const forecastData = await ApiService.getForecast(selectedDisease, 'sarima');
+        const cutoffMonth = endDate ? endDate.substring(0, 7) : undefined;
+        const startMonth = startDate ? startDate.substring(0, 7) : undefined;
+
+        const forecastData = await ApiService.getForecast(selectedDisease, 'sarima', cutoffMonth);
         if (forecastData && forecastData.points) {
-          const hist = forecastData.points.filter((p) => !p.isForecast).slice(-10);
+          // Filter historical by startMonth and cutoffMonth
+          let hist = forecastData.points.filter((p) => !p.isForecast);
+          if (startMonth) {
+            hist = hist.filter((p) => p.month >= startMonth);
+          }
+          if (cutoffMonth) {
+            hist = hist.filter((p) => p.month <= cutoffMonth);
+          }
+          hist = hist.slice(-12);
+
           const fut = forecastData.points.filter((p) => p.isForecast).slice(0, 4);
           const lastObserved = hist.length > 0 ? hist[hist.length - 1] : null;
 
@@ -79,10 +97,11 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
           const nextMonthVal = fut[0]?.forecast || 0;
           const isSurging = nextMonthVal > thisMonthVal * 1.15;
 
+          const activeDisObj = diseasesList.find((d) => (d.code || d.id) === selectedDisease);
           setMetrics({
             thisMonthCases: thisMonthVal,
             nextMonthCases: nextMonthVal,
-            topCondition: diseasesList[0]?.name || 'Penyakit Terpantau',
+            topCondition: activeDisObj?.name || diseasesList[0]?.name || 'Penyakit Terpantau',
             surgeRisk: isSurging ? 'Waspada Lonjakan' : 'Aman Terkendali',
           });
         }
@@ -94,7 +113,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
     }
 
     loadForecastData();
-  }, [selectedDisease, diseasesList]);
+  }, [selectedDisease, diseasesList, startDate, endDate]);
 
   return (
     <div className="space-y-8">
@@ -182,7 +201,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
             >
               <option value="all">Semua Penyakit (Gabungan)</option>
               {diseasesList.map((d) => (
-                <option key={d.id} value={d.id}>
+                <option key={d.code || d.id} value={d.code || d.id}>
                   {d.name} ({d.code})
                 </option>
               ))}

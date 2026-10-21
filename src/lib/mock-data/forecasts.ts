@@ -1,20 +1,14 @@
 import { ForecastPoint } from '../../types';
 import { MOCK_MONTHLY_CASES, MONTH_NAMES } from './monthlyCases';
 
-// Future 12 months horizon: Oct 2026 to Sep 2027
+// 6-12 months horizon based on dataset cutoff (Dec 2021 - May 2022)
 export const FORECAST_MONTHS = [
-  { month: '2026-10', displayMonth: 'Oct 2026', monthNum: 10 },
-  { month: '2026-11', displayMonth: 'Nov 2026', monthNum: 11 },
-  { month: '2026-12', displayMonth: 'Dec 2026', monthNum: 12 },
-  { month: '2027-01', displayMonth: 'Jan 2027', monthNum: 1 },
-  { month: '2027-02', displayMonth: 'Feb 2027', monthNum: 2 },
-  { month: '2027-03', displayMonth: 'Mar 2027', monthNum: 3 },
-  { month: '2027-04', displayMonth: 'Apr 2027', monthNum: 4 },
-  { month: '2027-05', displayMonth: 'May 2027', monthNum: 5 },
-  { month: '2027-06', displayMonth: 'Jun 2027', monthNum: 6 },
-  { month: '2027-07', displayMonth: 'Jul 2027', monthNum: 7 },
-  { month: '2027-08', displayMonth: 'Aug 2027', monthNum: 8 },
-  { month: '2027-09', displayMonth: 'Sep 2027', monthNum: 9 },
+  { month: '2021-12', displayMonth: 'Dec 2021', monthNum: 12 },
+  { month: '2022-01', displayMonth: 'Jan 2022', monthNum: 1 },
+  { month: '2022-02', displayMonth: 'Feb 2022', monthNum: 2 },
+  { month: '2022-03', displayMonth: 'Mar 2022', monthNum: 3 },
+  { month: '2022-04', displayMonth: 'Apr 2022', monthNum: 4 },
+  { month: '2022-05', displayMonth: 'May 2022', monthNum: 5 },
 ];
 
 export interface ForecastDataset {
@@ -127,8 +121,8 @@ export const getForecastForDisease = (diseaseId: string, modelId: string = 'sari
     modelId,
     points: combined,
     metadata: {
-      generationDate: '2026-10-01 04:00 UTC',
-      cutoffDate: '2026-09-30',
+      generationDate: '2021-12-01 00:00 UTC',
+      cutoffDate: '2021-11-30',
       modelVersion: modelId === 'sarima' ? 'SARIMA v1.4.2' : modelId === 'ets' ? 'ETS-Triple-Exp v2.1' : 'S-Naive Baseline v1.0',
       backtestWape: modelId === 'sarima' ? 6.8 : modelId === 'ets' ? 8.4 : 12.3,
       trainingDataPoints: histPoints.length,

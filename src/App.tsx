@@ -24,6 +24,10 @@ export default function App() {
   const [selectedHospital, setSelectedHospital] = useState<string>(
     'St. Jude Memorial Hospital (Main Campus)'
   );
+  const [dateRange, setDateRange] = useState<{ startDate: string; endDate: string }>({
+    startDate: '2020-01-01',
+    endDate: '2021-11-30',
+  });
 
   return (
     <div className="h-screen w-screen bg-[#fafbfc] text-slate-900 font-sans flex overflow-hidden">
@@ -47,13 +51,20 @@ export default function App() {
           selectedHospital={selectedHospital}
           onSelectHospital={setSelectedHospital}
           onToggleSidebarMobile={() => setIsMobileSidebarOpen(true)}
+          startDate={dateRange.startDate}
+          endDate={dateRange.endDate}
+          onDateRangeChange={(start, end) => setDateRange({ startDate: start, endDate: end })}
         />
 
         {/* Scrollable Page Body - Content scrolls smoothly beneath TopNavbar */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8">
           <div className="max-w-7xl w-full mx-auto pb-16">
             {currentTab === 'overview' && (
-              <OverviewPage onNavigate={setCurrentTab} />
+              <OverviewPage
+                onNavigate={setCurrentTab}
+                startDate={dateRange.startDate}
+                endDate={dateRange.endDate}
+              />
             )}
             {currentTab === 'trends' && (
               <DiseaseTrendsPage simpleMode={true} />

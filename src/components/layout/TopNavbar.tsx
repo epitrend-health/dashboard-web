@@ -24,6 +24,9 @@ interface TopNavbarProps {
   selectedHospital: string;
   onSelectHospital: (hospital: string) => void;
   onToggleSidebarMobile?: () => void;
+  startDate?: string;
+  endDate?: string;
+  onDateRangeChange?: (startDate: string, endDate: string) => void;
 }
 
 const PAGE_TITLES: Record<NavigationTab, { title: string; subtitle: string }> = {
@@ -73,14 +76,25 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
   selectedHospital,
   onSelectHospital,
   onToggleSidebarMobile,
+  startDate: propStartDate = '2020-01-01',
+  endDate: propEndDate = '2022-05-31',
+  onDateRangeChange,
 }) => {
   const [hospitalDropdownOpen, setHospitalDropdownOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [dateFilterOpen, setDateFilterOpen] = useState(false);
-  const [startDate, setStartDate] = useState('2020-01-01');
-  const [endDate, setEndDate] = useState('2022-05-31');
-  const [selectedRange, setSelectedRange] = useState('2020-01 s/d 2022-05');
+  const [startDate, setStartDate] = useState(propStartDate);
+  const [endDate, setEndDate] = useState(propEndDate);
+  const [selectedRange, setSelectedRange] = useState(
+    `${propStartDate.substring(0, 7)} s/d ${propEndDate.substring(0, 7)}`
+  );
+
+  useEffect(() => {
+    setStartDate(propStartDate);
+    setEndDate(propEndDate);
+    setSelectedRange(`${propStartDate.substring(0, 7)} s/d ${propEndDate.substring(0, 7)}`);
+  }, [propStartDate, propEndDate]);
 
   const hospitalRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -321,6 +335,9 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                       const startShort = startDate.substring(0, 7);
                       const endShort = endDate.substring(0, 7);
                       setSelectedRange(`${startShort} s/d ${endShort}`);
+                      if (onDateRangeChange) {
+                        onDateRangeChange(startDate, endDate);
+                      }
                       setDateFilterOpen(false);
                     }}
                     className="px-3 py-1.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 rounded-lg shadow-xs transition-colors"
