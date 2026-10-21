@@ -145,15 +145,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {/* Hospital Sub-header */}
-        {(!isCollapsed || isMobileOpen) && (
-          <div className="px-4 py-2 bg-slate-950/40 border-b border-slate-800/60">
-            <div className="flex items-center gap-2 text-xs text-slate-300">
-              <Building2 className="w-3.5 h-3.5 text-teal-400 shrink-0" />
-              <span className="truncate font-medium">{hospitalName.replace(' (Main Campus)', '')}</span>
-            </div>
-          </div>
-        )}
 
         {/* Navigation List by Categories */}
         <nav className="flex-1 px-3 py-3 space-y-4 overflow-y-auto">
